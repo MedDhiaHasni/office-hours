@@ -1,78 +1,87 @@
-# 🎓 Office Hours
+# Office Hours
 
-> **A Vampire Survivors-style browser game where you play a burnt-out professor trying to survive 5 minutes of students swarming your office.**
+A Vampire Survivors-style browser game in which you play a burnt-out professor trying to survive five minutes of students swarming your office.
 
-No installs. No downloads. Just click and play.
+No installation required. Open the link and play.
 
----
+**Play now:** [https://meddhiahasni.github.io/office-hours/](https://meddhiahasni.github.io/office-hours/)
 
-## 🎮 Play Now
+Supported on desktop browsers. Mobile support is planned.
 
-👉 **[Play Office Hours](https://meddhiahasni.github.io/office-hours/)**
+## Table of Contents
 
-*(Works on desktop browsers. Mobile support coming soon.)*
-
----
-
-## 📖 The Story
-
-It's 3 PM on a Friday. You just want to go home. But it's **Office Hours** — and the students keep coming. Freshmen, gunners, sleepers, email demons, and even the Dean himself. Survive until **4:00 PM** and you've earned the weekend.
-
----
-
-## 🕹️ How to Play
-
-| Action          | Control                            |
-|-----------------|------------------------------------|
-| **Move**        | `WASD` or `Arrow Keys`             |
-| **Aim**         | Move your **mouse**                |
-| **Throw Paper** | **Left-Click** (hold to auto-fire) |
-
-**Goal:** Survive **5 minutes** until the clock hits 4:00 PM.
-
-**Strategy:** Keep moving. Kill students to drop XP. Collect XP to level up. Pick upgrades that synergize with your playstyle.
+- [The Story](#the-story)
+- [How to Play](#how-to-play)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Run Locally](#run-locally)
+- [Build and Deploy](#build-and-deploy)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Credits](#credits)
 
 ---
 
-## ⚡ Features
+## The Story
 
-- 🎯 **Manual mouse aiming** — no aimbot, just skill
-- 📈 **Level-up system** with 10+ unique upgrades
-- 🌊 **Wave events** every 30 seconds (Midterm Season! Email Storm! The Dean Approaches!)
-- 👥 **5 enemy types** with different AI behaviors
-- 🔊 **Sound effects** for shooting, hits, kills, and level-ups
-- 🏆 **Best-time tracking** (saved locally)
-- 💥 **Juice** — screen shake, hit-stop, damage numbers, particle bursts
-- 🎨 **Emoji-based sprites** — no external assets, loads instantly
+It is 3 PM on a Friday, and you just want to go home. But it is office hours, and the students keep coming: freshmen, gunners, sleepers, email demons, and even the Dean himself. Survive until 4:00 PM and you have earned the weekend.
 
 ---
 
-## 🛠️ Tech Stack
+## How to Play
 
-| Layer           | Tech                                         |
-|-----------------|----------------------------------------------|
-| **Language**    | JavaScript (ES6+)                            |
-| **Game Engine** | [Phaser 3](https://phaser.io/)               |
-| **Physics**     | Phaser Arcade Physics                        |
-| **Audio**       | [Howler.js](https://howlerjs.com/)           |
-| **Build Tool**  | [Vite](https://vitejs.dev/)                  |
-| **Hosting**     | GitHub Pages                                 |
+| Action      | Control                            |
+|-------------|------------------------------------|
+| Move        | `WASD` or arrow keys               |
+| Aim         | Move the mouse                     |
+| Throw paper | Left-click (hold to auto-fire)     |
 
-**Bundle size:** ~370 KB gzipped. **Load time:** under 1s on 4G.
+**Goal:** survive five minutes, until the clock reaches 4:00 PM.
+
+**Strategy:** keep moving. Defeating students drops XP, and collecting XP levels you up. Choose upgrades that complement your playstyle.
 
 ---
 
-## 🚀 Run Locally
+## Features
+
+- **Manual mouse aiming:** no aim assist, so accuracy is up to the player.
+- **Level-up system:** more than 10 unique upgrades.
+- **Wave events:** a new event every 30 seconds (Midterm Season, Email Storm, The Dean Approaches).
+- **Five enemy types:** each with different AI behavior.
+- **Sound effects:** shooting, hits, kills, and level-ups.
+- **Best-time tracking:** saved locally in the browser.
+- **Game feel:** screen shake, hit-stop, damage numbers, and particle bursts.
+- **Emoji-based sprites:** no external image assets, so the game loads instantly.
+
+---
+
+## Tech Stack
+
+| Layer       | Technology                                |
+|-------------|-------------------------------------------|
+| Language    | JavaScript (ES6+)                         |
+| Game engine | [Phaser 3](https://phaser.io/)            |
+| Physics     | Phaser Arcade Physics                     |
+| Audio       | [Howler.js](https://howlerjs.com/)        |
+| Build tool  | [Vite](https://vitejs.dev/)               |
+| Hosting     | GitHub Pages                              |
+
+**Bundle size:** about 370 KB gzipped. **Load time:** under one second on a 4G connection.
+
+---
+
+## Run Locally
 
 ```bash
-# Clone the repo
+# Clone the repository
 git clone https://github.com/MedDhiaHasni/office-hours.git
 cd office-hours
 
 # Install dependencies
 npm install
 
-# Start the dev server
+# Start the development server
 npm run dev
 ```
 
@@ -80,7 +89,7 @@ Open `http://localhost:5173/` in your browser.
 
 ---
 
-## 📦 Build & Deploy
+## Build and Deploy
 
 ```bash
 # Build for production
@@ -90,18 +99,23 @@ npm run build
 npm run deploy
 ```
 
-The `dist/` folder is what gets served. The `gh-pages` branch hosts the live site.
+The `dist/` folder contains the production build that is served. The `gh-pages` branch hosts the live site.
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [x] Core game loop (survive 5 min)
-- [x] Mouse aiming + manual fire
+**Completed**
+
+- [x] Core game loop (survive five minutes)
+- [x] Mouse aiming and manual fire
 - [x] Upgrade system
 - [x] Sound effects
 - [x] Wave events
-- [ ] Custom sprites (replace emojis)
+
+**Planned**
+
+- [ ] Custom sprites to replace emojis
 - [ ] Background music
 - [ ] Mobile touch controls
 - [ ] Boss fights with attack patterns
@@ -111,29 +125,23 @@ The `dist/` folder is what gets served. The `gh-pages` branch hosts the live sit
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-This is a personal project, but ideas and PRs are welcome! Open an issue if you find a bug or have a suggestion.
-
----
-
-## 📜 License
-
-MIT — do whatever you want with it.
+This is a personal project, but ideas and pull requests are welcome. Open an issue to report a bug or suggest an improvement.
 
 ---
 
-## 🙏 Credits
+## License
+
+Released under the MIT License.
+
+---
+
+## Credits
 
 - Game engine: [Phaser 3](https://phaser.io/)
 - Audio library: [Howler.js](https://howlerjs.com/)
 - Sound effects: Google Actions Sound Library
-- Built by: [Med Dhia Hasni](https://github.com/MedDhiaHasni)
+- Created by [Med Dhia Hasni](https://github.com/MedDhiaHasni)
 
----
-
-## ⭐ If you like it...
-
-Give the repo a star ⭐ — it helps more people discover the game!
-
-Now go survive those office hours. 📚💀
+If you enjoy the game, consider giving the repository a star. It helps other people discover it.
