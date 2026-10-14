@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../main.js';
 import HUD from '../systems/HUD.js';
+import JuiceFX from '../systems/JuiceFX.js';
 import { WAVES, getEnemyConfig, pickRandomEnemyType } from '../systems/WaveSystem.js';
 import { soundSystem } from '../systems/SoundSystem.js';
 
@@ -15,6 +16,10 @@ export default class GameScene extends Phaser.Scene {
     create() {
         this.gameSceneRef = this;
         this._ended = false;
+
+        // === JUICE ===
+        this.fx = new JuiceFX(this);
+        this._hitStopping = false;
 
         // === STATE ===
         this.timeRemaining = RUN_DURATION_MS;
@@ -42,7 +47,6 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
         this.cameras.main.setBackgroundColor('#3d2419');
 
-        // Faux floor streaks
         for (let i = 0; i < 300; i++) {
             this.add.rectangle(
                 Phaser.Math.Between(0, WORLD_SIZE),
@@ -58,6 +62,8 @@ export default class GameScene extends Phaser.Scene {
         this.player.setScale(1.6).setDepth(10).setCollideWorldBounds(true);
         this.player.body.setCircle(20, 12, 12);
         this.player.stats = this.playerStats;
+        // Store base scale for squash recovery
+        this.player.baseScale = 1.6;
 
         // === INPUT ===
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -82,45 +88,32 @@ export default class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, this.enemyProjectiles, this.onPlayerHitEnemyProjectile, null, this);
         this.physics.add.overlap(this.player, this.xpGems, this.onCollectGem, null, this);
 
-        // === TIMERS (no auto-fire — player shoots manually) ===
+        // === TIMERS ===
         this.spawnTimer = this.time.addEvent({
-            delay: 900,
-            callback: this.dripSpawn,
-            callbackScope: this,
-            loop: true
+            delay: 900, callback: this.dripSpawn, callbackScope: this, loop: true
         });
-
         this.rantTimer = this.time.addEvent({
-            delay: 4000,
-            callback: this.doRant,
-            callbackScope: this,
-            loop: true
+            delay: 4000, callback: this.doRant, callbackScope: this, loop: true
         });
-
         this.waveChecker = this.time.addEvent({
-            delay: 500,
-            callback: this.checkWaves,
-            callbackScope: this,
-            loop: true
+            delay: 500, callback: this.checkWaves, callbackScope: this, loop: true
         });
 
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-
         this.dripSpawn();
         this.dripSpawn();
 
-        // Cursor crosshair
+        // Custom crosshair
         this.input.setDefaultCursor('crosshair');
     }
 
     update(time, delta) {
         if (!this.player.active) return;
 
-        // Clock
         this.timeRemaining -= delta;
         this.hud.updateClock(Math.max(0, this.timeRemaining));
 
-        // === MOVEMENT ===
+        // MOVEMENT
         const stats = this.playerStats;
         let vx = 0, vy = 0;
         if (this.cursors.left.isDown || this.keys.left.isDown) vx = -1;
@@ -131,24 +124,22 @@ export default class GameScene extends Phaser.Scene {
         if (vx !== 0 && vy !== 0) { vx *= 0.707; vy *= 0.707; }
         this.player.setVelocity(vx * stats.moveSpeed, vy * stats.moveSpeed);
 
-        // === MANUAL MOUSE AIMING ===
+        // MANUAL MOUSE AIMING
         const pointer = this.input.activePointer;
         const worldPoint = pointer.positionToCamera(this.cameras.main);
         const aimAngle = Phaser.Math.Angle.Between(
             this.player.x, this.player.y,
             worldPoint.x, worldPoint.y
         );
-
-        // Rotate player to face cursor (+PI/2 because emoji faces up)
         this.player.setRotation(aimAngle + Math.PI / 2);
 
-        // Fire on mouse hold, respecting fireRate cooldown
+        // FIRE
         if (pointer.isDown && time > this.lastFired) {
             this.fireProjectileAtAngle(aimAngle);
             this.lastFired = time + stats.fireRate;
         }
 
-        // === XP GEM MAGNET ===
+        // XP GEM MAGNET
         this.xpGems.getChildren().forEach(gem => {
             if (!gem.active) return;
             const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, gem.x, gem.y);
@@ -161,7 +152,7 @@ export default class GameScene extends Phaser.Scene {
             if (d > 2000) gem.destroy();
         });
 
-        // === ENEMY AI ===
+        // ENEMY AI
         this.enemies.getChildren().forEach(enemy => {
             if (!enemy.active || !enemy.body) return;
             const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
@@ -181,23 +172,19 @@ export default class GameScene extends Phaser.Scene {
             if (d > 2500) enemy.destroy();
         });
 
-        // Cleanup projectiles
+        // CLEANUP
         this.projectiles.getChildren().forEach(p => {
             if (!p.active) return;
             const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, p.x, p.y);
             if (d > 1400) p.destroy();
         });
-
         this.enemyProjectiles.getChildren().forEach(p => {
             if (!p.active) return;
             const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, p.x, p.y);
             if (d > 1400) p.destroy();
         });
 
-        // === WIN ===
-        if (this.timeRemaining <= 0) {
-            this.winGame();
-        }
+        if (this.timeRemaining <= 0) this.winGame();
     }
 
     fireProjectileAtAngle(angle) {
@@ -211,13 +198,25 @@ export default class GameScene extends Phaser.Scene {
         this.physics.velocityFromRotation(angle, 550, proj.body.velocity);
         proj.setRotation(angle);
 
+        // JUICE: Spawn pop-in
         proj.setScale(0.2);
         this.tweens.add({
-            targets: proj,
-            scale: 0.9,
-            duration: 100,
-            ease: 'Back.Out'
+            targets: proj, scale: 0.9, duration: 100, ease: 'Back.Out'
         });
+
+        // JUICE: muzzle flash
+        const muzzleX = this.player.x + Math.cos(angle) * 20;
+        const muzzleY = this.player.y + Math.sin(angle) * 20;
+        this.fx.muzzleFlash(muzzleX, muzzleY, angle, 0xffffaa);
+
+        // JUICE: camera recoil
+        this.fx.cameraRecoil(angle, 4);
+
+        // JUICE: player recoil
+        this.fx.recoil(this.player, angle, 3, 100);
+
+        // JUICE: player squash
+        this.fx.squashAndStretch(this.player, 'x', 0.08, 100);
 
         soundSystem.play('shoot');
     }
@@ -229,6 +228,9 @@ export default class GameScene extends Phaser.Scene {
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
         this.physics.velocityFromRotation(angle, 250, proj.body.velocity);
         proj.setRotation(angle);
+
+        // Small enemy fire flash
+        this.fx.muzzleFlash(enemy.x, enemy.y, angle, 0xaaddff);
     }
 
     dripSpawn() {
@@ -255,8 +257,15 @@ export default class GameScene extends Phaser.Scene {
         enemy.lastShot = 0;
         enemy.body.setCircle(15, 17, 17);
 
-        enemy.setAlpha(0);
-        this.tweens.add({ targets: enemy, alpha: 1, duration: 200 });
+        // Spawn pop-in with scale animation
+        const targetScale = cfg.isBoss ? 2.5 : 1.4;
+        enemy.setScale(0);
+        this.tweens.add({
+            targets: enemy,
+            scale: targetScale,
+            duration: 250,
+            ease: 'Back.Out'
+        });
     }
 
     checkWaves() {
@@ -272,7 +281,8 @@ export default class GameScene extends Phaser.Scene {
 
     triggerWave(wave) {
         this.hud.showWaveMessage(wave.message);
-        this.cameras.main.flash(300, 255, 200, 0);
+        // Bigger flash for waves
+        this.cameras.main.flash(400, 255, 200, 0);
 
         if (wave.type === 'burst' || wave.type === 'boss') {
             for (let i = 0; i < wave.count; i++) {
@@ -295,15 +305,22 @@ export default class GameScene extends Phaser.Scene {
         if (!proj.active || !enemy.active) return;
 
         enemy.hp -= proj.damage;
-        soundSystem.play('hit');
 
-        enemy.setTintFill(0xffffff);
-        this.time.delayedCall(60, () => {
-            if (enemy.active) enemy.setTint(enemy.enemyConfig.tint);
+        // JUICE: impact poof at collision point
+        this.fx.impactPoof(proj.x, proj.y, 0xffddaa);
+
+        // JUICE: enemy flash tint
+        this.fx.flashTint(enemy, 0xffffff, 60);
+
+        // JUICE: damage popup
+        this.fx.damagePopup(enemy.x, enemy.y - 10, proj.damage, {
+            color: '#ffff00', fontSize: 18
         });
 
-        this.spawnDamageNumber(enemy.x, enemy.y, proj.damage);
-        this.cameras.main.shake(50, 0.003);
+        // JUICE: tiny camera shake per hit
+        this.cameras.main.shake(40, 0.002);
+
+        soundSystem.play('hit');
 
         if (enemy.hp <= 0) {
             this.killEnemy(enemy);
@@ -319,21 +336,19 @@ export default class GameScene extends Phaser.Scene {
     killEnemy(enemy) {
         soundSystem.play('kill');
 
-        for (let i = 0; i < 6; i++) {
-            const p = this.add.rectangle(enemy.x, enemy.y, 5, 5, 0xff5544).setDepth(15);
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 100 + Math.random() * 150;
-            this.tweens.add({
-                targets: p,
-                x: enemy.x + Math.cos(angle) * speed,
-                y: enemy.y + Math.sin(angle) * speed,
-                alpha: 0,
-                scale: 0,
-                duration: 400,
-                onComplete: () => p.destroy()
-            });
-        }
+        // JUICE: hit-stop on kill (freezes 40ms for impact)
+        this.fx.hitStop(40);
 
+        // JUICE: death burst particles
+        this.fx.deathBurst(enemy.x, enemy.y, 0xff5544, enemy.enemyConfig.isBoss ? 20 : 10);
+
+        // JUICE: enemy squash into oblivion
+        this.fx.squashAndStretch(enemy, 'y', 0.5, 100);
+
+        // JUICE: bigger camera shake for kills
+        this.cameras.main.shake(80, 0.004);
+
+        // XP gem drop with bounce
         const count = enemy.enemyConfig.isBoss ? 5 : 1;
         for (let i = 0; i < count; i++) {
             this.time.delayedCall(i * 40, () => {
@@ -343,6 +358,12 @@ export default class GameScene extends Phaser.Scene {
                     gem.setScale(0.6).setDepth(3);
                     const a = Math.random() * Math.PI * 2;
                     gem.setVelocity(Math.cos(a) * 80, Math.sin(a) * 80);
+
+                    // Spawn pop
+                    gem.setScale(0);
+                    this.tweens.add({
+                        targets: gem, scale: 0.6, duration: 200, ease: 'Back.Out'
+                    });
                 }
             });
         }
@@ -351,25 +372,6 @@ export default class GameScene extends Phaser.Scene {
         this.hud.updateKills(this.kills);
 
         enemy.destroy();
-    }
-
-    spawnDamageNumber(x, y, damage) {
-        const txt = this.add.text(x, y, damage.toString(), {
-            fontSize: '18px',
-            color: '#ffff00',
-            fontStyle: 'bold',
-            stroke: '#000',
-            strokeThickness: 3
-        }).setOrigin(0.5).setDepth(50);
-
-        this.tweens.add({
-            targets: txt,
-            y: y - 30,
-            alpha: 0,
-            duration: 600,
-            ease: 'Power2',
-            onComplete: () => txt.destroy()
-        });
     }
 
     onPlayerHitEnemy(player, enemy) {
@@ -390,8 +392,14 @@ export default class GameScene extends Phaser.Scene {
         const stats = this.playerStats;
         stats.hp -= amount;
         this.hud.updateHP(stats.hp, stats.maxHp);
-        this.cameras.main.shake(200, 0.01);
-        this.cameras.main.flash(120, 255, 0, 0);
+
+        // JUICE: BIG hit feedback
+        this.cameras.main.shake(250, 0.012);
+        this.cameras.main.flash(150, 255, 0, 0);
+        this.fx.vignettePulse(0xff0000);
+        this.fx.flashTint(this.player, 0xff0000, 150);
+        this.fx.squashAndStretch(this.player, 'y', 0.3, 200);
+
         soundSystem.play('hurt');
 
         if (stats.hp <= 0) {
@@ -405,6 +413,9 @@ export default class GameScene extends Phaser.Scene {
         stats.xp += 1;
         this.hud.updateXP(stats.xp, stats.xpNeeded, stats.level);
 
+        // JUICE: tiny sparkle on collect
+        this.fx.impactPoof(gem.x, gem.y, 0x88ff88);
+
         if (stats.xp >= stats.xpNeeded) {
             this.levelUp();
         }
@@ -416,7 +427,11 @@ export default class GameScene extends Phaser.Scene {
         stats.level++;
         stats.xpNeeded = Math.floor(stats.xpNeeded * 1.35 + 2);
 
-        this.cameras.main.flash(300, 255, 215, 0);
+        // JUICE: slow-mo + flash + burst
+        this.fx.slowMotion(0.4, 300);
+        this.cameras.main.flash(400, 255, 215, 0);
+        this.fx.deathBurst(this.player.x, this.player.y, 0xffd700, 20);
+
         soundSystem.play('levelup');
 
         this.scene.pause();
@@ -435,9 +450,14 @@ export default class GameScene extends Phaser.Scene {
                 const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, enemy.x, enemy.y);
                 enemy.x += Math.cos(angle) * 100;
                 enemy.y += Math.sin(angle) * 100;
-                this.spawnDamageNumber(enemy.x, enemy.y, 'PUSH!');
+                this.fx.damagePopup(enemy.x, enemy.y - 10, 'PUSH!', {
+                    color: '#ff8888', fontSize: 14
+                });
             }
         });
+
+        // Ring effect around player
+        this.fx.deathBurst(this.player.x, this.player.y, 0xffffff, 8);
         this.cameras.main.shake(150, 0.008);
     }
 
@@ -449,9 +469,7 @@ export default class GameScene extends Phaser.Scene {
         soundSystem.play('victory');
         this.time.delayedCall(100, () => {
             this.scene.start('GameOverScene', {
-                victory: true,
-                kills: this.kills,
-                timeMs: RUN_DURATION_MS
+                victory: true, kills: this.kills, timeMs: RUN_DURATION_MS
             });
         });
     }
@@ -459,14 +477,20 @@ export default class GameScene extends Phaser.Scene {
     loseGame() {
         if (this._ended) return;
         this._ended = true;
+
+        // JUICE: dramatic slow-mo death
+        this.fx.slowMotion(0.3, 800);
+        this.cameras.main.flash(400, 255, 0, 0);
+        this.cameras.main.shake(400, 0.02);
+        this.fx.deathBurst(this.player.x, this.player.y, 0xff0000, 25);
+
         this.physics.pause();
         this.input.setDefaultCursor('default');
+
         const survived = RUN_DURATION_MS - Math.max(0, this.timeRemaining);
-        this.time.delayedCall(100, () => {
+        this.time.delayedCall(1200, () => {
             this.scene.start('GameOverScene', {
-                victory: false,
-                kills: this.kills,
-                timeMs: survived
+                victory: false, kills: this.kills, timeMs: survived
             });
         });
     }
