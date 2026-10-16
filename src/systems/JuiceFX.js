@@ -43,6 +43,7 @@ export default class JuiceFX {
 
     // ============================
     // RECOIL: Nudge a sprite away from a direction
+    // (Note: do NOT use on physics-body sprites; use scale pop instead)
     // ============================
     recoil(sprite, angle, distance = 4, durationMs = 120) {
         if (!sprite || !sprite.active) return;
@@ -159,7 +160,7 @@ export default class JuiceFX {
     }
 
     // ============================
-    // DAMAGE POPUP: Floating number
+    // DAMAGE POPUP: Floating number with physics arc
     // ============================
     damagePopup(x, y, amount, options = {}) {
         const {
@@ -176,16 +177,30 @@ export default class JuiceFX {
             strokeThickness: 3
         }).setOrigin(0.5).setDepth(50);
 
-        const randomX = (Math.random() - 0.5) * 30;
+        // Randomized horizontal drift
+        const driftX = (Math.random() - 0.5) * 60;
+        const peakY = y - 45 - Math.random() * 15;
+        const rotation = (Math.random() - 0.5) * 0.5;
 
+        // Phase 1: fly up + drift
         this.scene.tweens.add({
             targets: text,
-            x: x + randomX,
-            y: y - 40,
-            alpha: 0,
-            duration: 700,
+            x: x + driftX * 0.5,
+            y: peakY,
+            rotation,
+            duration: 350,
             ease: 'Power2',
-            onComplete: () => text.destroy()
+            onComplete: () => {
+                // Phase 2: gravity fall + fade
+                this.scene.tweens.add({
+                    targets: text,
+                    y: peakY + 40,
+                    alpha: 0,
+                    duration: 400,
+                    ease: 'Power2',
+                    onComplete: () => text.destroy()
+                });
+            }
         });
     }
 

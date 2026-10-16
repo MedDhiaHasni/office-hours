@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../main.js';
 import HUD from '../systems/HUD.js';
 import JuiceFX from '../systems/JuiceFX.js';
+import DecalSystem from '../systems/DecalSystem.js';
+import AmbientParticles from '../systems/AmbientParticles.js';
 import { WAVES, getEnemyConfig, pickRandomEnemyType } from '../systems/WaveSystem.js';
 import { soundSystem } from '../systems/SoundSystem.js';
 
@@ -47,6 +49,7 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
         this.cameras.main.setBackgroundColor('#3d2419');
 
+        // Faux floor streaks
         for (let i = 0; i < 300; i++) {
             this.add.rectangle(
                 Phaser.Math.Between(0, WORLD_SIZE),
@@ -62,7 +65,6 @@ export default class GameScene extends Phaser.Scene {
         this.player.setScale(1.6).setDepth(10).setCollideWorldBounds(true);
         this.player.body.setCircle(20, 12, 12);
         this.player.stats = this.playerStats;
-        // Store base scale for squash recovery
         this.player.baseScale = 1.6;
 
         // === INPUT ===
@@ -81,6 +83,10 @@ export default class GameScene extends Phaser.Scene {
         this.hud = new HUD(this);
         this.hud.updateHP(this.playerStats.hp, this.playerStats.maxHp);
         this.hud.updateXP(this.playerStats.xp, this.playerStats.xpNeeded, this.playerStats.level);
+
+        // === SYSTEMS ===
+        this.decals = new DecalSystem(this, 60);
+        this.ambient = new AmbientParticles(this, 40);
 
         // === COLLISIONS ===
         this.physics.add.overlap(this.player, this.enemies, this.onPlayerHitEnemy, null, this);
@@ -103,7 +109,6 @@ export default class GameScene extends Phaser.Scene {
         this.dripSpawn();
         this.dripSpawn();
 
-        // Custom crosshair
         this.input.setDefaultCursor('crosshair');
     }
 
@@ -112,6 +117,10 @@ export default class GameScene extends Phaser.Scene {
 
         this.timeRemaining -= delta;
         this.hud.updateClock(Math.max(0, this.timeRemaining));
+
+        // Tick atmosphere systems
+        this.decals.update();
+        this.ambient.update();
 
         // MOVEMENT
         const stats = this.playerStats;
@@ -152,12 +161,18 @@ export default class GameScene extends Phaser.Scene {
             if (d > 2000) gem.destroy();
         });
 
-        // ENEMY AI
+        // ENEMY AI WITH WOBBLE
+        const t = time * 0.001;
         this.enemies.getChildren().forEach(enemy => {
             if (!enemy.active || !enemy.body) return;
             const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
             const speed = enemy.enemyConfig.speed;
             enemy.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+            // WOBBLE: rotate side-to-side based on a per-enemy phase
+            if (!enemy.wobblePhase) enemy.wobblePhase = Math.random() * Math.PI * 2;
+            const wobble = Math.sin(t * 8 + enemy.wobblePhase) * 0.25;
+            enemy.setRotation(angle + Math.PI / 2 + wobble);
 
             if (enemy.enemyConfig.ranged) {
                 const now = this.time.now;
@@ -204,6 +219,23 @@ export default class GameScene extends Phaser.Scene {
             targets: proj, scale: 0.9, duration: 100, ease: 'Back.Out'
         });
 
+        // TRAIL: fading ghost trails behind projectile
+        for (let i = 1; i <= 2; i++) {
+            const ghost = this.add.image(proj.x, proj.y, 'grade')
+                .setScale(0.6 - i * 0.15)
+                .setAlpha(0.4 - i * 0.15)
+                .setDepth(6)
+                .setRotation(angle);
+            this.tweens.add({
+                targets: ghost,
+                alpha: 0,
+                scale: 0.1,
+                duration: 250,
+                delay: i * 60,
+                onComplete: () => ghost.destroy()
+            });
+        }
+
         // JUICE: muzzle flash
         const muzzleX = this.player.x + Math.cos(angle) * 20;
         const muzzleY = this.player.y + Math.sin(angle) * 20;
@@ -212,11 +244,16 @@ export default class GameScene extends Phaser.Scene {
         // JUICE: camera recoil
         this.fx.cameraRecoil(angle, 4);
 
-        // JUICE: player recoil
-        this.fx.recoil(this.player, angle, 3, 100);
-
-        // JUICE: player squash
-        this.fx.squashAndStretch(this.player, 'x', 0.08, 100);
+        // JUICE: player "punch" — scale pop instead of position recoil
+        const baseScale = this.player.baseScale || 1.6;
+        this.player.setScale(baseScale * 1.12, baseScale * 0.9);
+        this.tweens.add({
+            targets: this.player,
+            scaleX: baseScale,
+            scaleY: baseScale,
+            duration: 120,
+            ease: 'Back.Out'
+        });
 
         soundSystem.play('shoot');
     }
@@ -229,7 +266,6 @@ export default class GameScene extends Phaser.Scene {
         this.physics.velocityFromRotation(angle, 250, proj.body.velocity);
         proj.setRotation(angle);
 
-        // Small enemy fire flash
         this.fx.muzzleFlash(enemy.x, enemy.y, angle, 0xaaddff);
     }
 
@@ -248,16 +284,15 @@ export default class GameScene extends Phaser.Scene {
 
         const enemy = this.enemies.create(x, y, cfg.texture);
         if (!enemy) return;
-        enemy.setScale(cfg.isBoss ? 2.5 : 1.4);
         enemy.setDepth(5);
         enemy.setTint(cfg.tint);
         enemy.hp = cfg.hp;
         enemy.maxHp = cfg.hp;
         enemy.enemyConfig = cfg;
         enemy.lastShot = 0;
+        enemy.wobblePhase = Math.random() * Math.PI * 2;
         enemy.body.setCircle(15, 17, 17);
 
-        // Spawn pop-in with scale animation
         const targetScale = cfg.isBoss ? 2.5 : 1.4;
         enemy.setScale(0);
         this.tweens.add({
@@ -281,8 +316,17 @@ export default class GameScene extends Phaser.Scene {
 
     triggerWave(wave) {
         this.hud.showWaveMessage(wave.message);
-        // Bigger flash for waves
         this.cameras.main.flash(400, 255, 200, 0);
+
+        // ZOOM OUT briefly for dramatic effect
+        const cam = this.cameras.main;
+        cam.setZoom(1.05);
+        this.tweens.add({
+            targets: cam,
+            zoom: 1,
+            duration: 600,
+            ease: 'Power2'
+        });
 
         if (wave.type === 'burst' || wave.type === 'boss') {
             for (let i = 0; i < wave.count; i++) {
@@ -306,20 +350,14 @@ export default class GameScene extends Phaser.Scene {
 
         enemy.hp -= proj.damage;
 
-        // JUICE: impact poof at collision point
         this.fx.impactPoof(proj.x, proj.y, 0xffddaa);
-
-        // JUICE: enemy flash tint
+        this.decals.spawnPaperScrap(proj.x, proj.y);
         this.fx.flashTint(enemy, 0xffffff, 60);
-
-        // JUICE: damage popup
         this.fx.damagePopup(enemy.x, enemy.y - 10, proj.damage, {
             color: '#ffff00', fontSize: 18
         });
 
-        // JUICE: tiny camera shake per hit
         this.cameras.main.shake(40, 0.002);
-
         soundSystem.play('hit');
 
         if (enemy.hp <= 0) {
@@ -336,19 +374,32 @@ export default class GameScene extends Phaser.Scene {
     killEnemy(enemy) {
         soundSystem.play('kill');
 
-        // JUICE: hit-stop on kill (freezes 40ms for impact)
         this.fx.hitStop(40);
-
-        // JUICE: death burst particles
         this.fx.deathBurst(enemy.x, enemy.y, 0xff5544, enemy.enemyConfig.isBoss ? 20 : 10);
 
-        // JUICE: enemy squash into oblivion
-        this.fx.squashAndStretch(enemy, 'y', 0.5, 100);
+        // FLOOR DECAL: splatter where the enemy died
+        const splatterColor = enemy.enemyConfig.isBoss ? 0x4a0000 : 0x8b0000;
+        this.decals.spawnSplatter(enemy.x, enemy.y, splatterColor, enemy.enemyConfig.isBoss ? 1.5 : 1);
+        for (let i = 0; i < 3; i++) {
+            this.decals.spawnPaperScrap(
+                enemy.x + (Math.random() - 0.5) * 30,
+                enemy.y + (Math.random() - 0.5) * 30
+            );
+        }
 
-        // JUICE: bigger camera shake for kills
+        this.fx.squashAndStretch(enemy, 'y', 0.5, 100);
         this.cameras.main.shake(80, 0.004);
 
-        // XP gem drop with bounce
+        // ZOOM PULSE on kill
+        const cam = this.cameras.main;
+        this.tweens.add({
+            targets: cam,
+            zoom: 1.015,
+            duration: 60,
+            yoyo: true,
+            ease: 'Power2'
+        });
+
         const count = enemy.enemyConfig.isBoss ? 5 : 1;
         for (let i = 0; i < count; i++) {
             this.time.delayedCall(i * 40, () => {
@@ -358,8 +409,6 @@ export default class GameScene extends Phaser.Scene {
                     gem.setScale(0.6).setDepth(3);
                     const a = Math.random() * Math.PI * 2;
                     gem.setVelocity(Math.cos(a) * 80, Math.sin(a) * 80);
-
-                    // Spawn pop
                     gem.setScale(0);
                     this.tweens.add({
                         targets: gem, scale: 0.6, duration: 200, ease: 'Back.Out'
@@ -393,12 +442,14 @@ export default class GameScene extends Phaser.Scene {
         stats.hp -= amount;
         this.hud.updateHP(stats.hp, stats.maxHp);
 
-        // JUICE: BIG hit feedback
         this.cameras.main.shake(250, 0.012);
         this.cameras.main.flash(150, 255, 0, 0);
         this.fx.vignettePulse(0xff0000);
         this.fx.flashTint(this.player, 0xff0000, 150);
         this.fx.squashAndStretch(this.player, 'y', 0.3, 200);
+
+        // COFFEE STAIN decal
+        this.decals.spawnCoffeeStain(this.player.x, this.player.y);
 
         soundSystem.play('hurt');
 
@@ -413,7 +464,6 @@ export default class GameScene extends Phaser.Scene {
         stats.xp += 1;
         this.hud.updateXP(stats.xp, stats.xpNeeded, stats.level);
 
-        // JUICE: tiny sparkle on collect
         this.fx.impactPoof(gem.x, gem.y, 0x88ff88);
 
         if (stats.xp >= stats.xpNeeded) {
@@ -427,7 +477,6 @@ export default class GameScene extends Phaser.Scene {
         stats.level++;
         stats.xpNeeded = Math.floor(stats.xpNeeded * 1.35 + 2);
 
-        // JUICE: slow-mo + flash + burst
         this.fx.slowMotion(0.4, 300);
         this.cameras.main.flash(400, 255, 215, 0);
         this.fx.deathBurst(this.player.x, this.player.y, 0xffd700, 20);
@@ -456,7 +505,6 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        // Ring effect around player
         this.fx.deathBurst(this.player.x, this.player.y, 0xffffff, 8);
         this.cameras.main.shake(150, 0.008);
     }
@@ -478,7 +526,6 @@ export default class GameScene extends Phaser.Scene {
         if (this._ended) return;
         this._ended = true;
 
-        // JUICE: dramatic slow-mo death
         this.fx.slowMotion(0.3, 800);
         this.cameras.main.flash(400, 255, 0, 0);
         this.cameras.main.shake(400, 0.02);
