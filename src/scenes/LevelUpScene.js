@@ -15,10 +15,8 @@ export default class LevelUpScene extends Phaser.Scene {
     }
 
     create() {
-        // CRITICAL: guarantee input is enabled
         this.input.enabled = true;
 
-        // Dark overlay blocks stray clicks
         this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.78)
             .setOrigin(0, 0)
             .setInteractive();
@@ -50,6 +48,8 @@ export default class LevelUpScene extends Phaser.Scene {
             const y = GAME_HEIGHT / 2 + 50;
             this.createCard(x, y, cardW, cardH, up);
         });
+
+        soundSystem.play('levelup');
     }
 
     createCard(x, y, w, h, upgrade) {
@@ -93,6 +93,7 @@ export default class LevelUpScene extends Phaser.Scene {
         });
         bg.on('pointerdown', (pointer, lx, ly, event) => {
             if (event) event.stopPropagation();
+            soundSystem.play('uiClick');
             this.selectUpgrade(upgrade, container);
         });
     }
@@ -113,13 +114,12 @@ export default class LevelUpScene extends Phaser.Scene {
             alpha: 0,
             duration: 300,
             onComplete: () => {
-                // Resume GameScene BEFORE stopping this scene
                 if (this.gameScene && this.gameScene.scene) {
                     this.gameScene.scene.resume('GameScene');
                     try {
                         this.gameScene.hud.updateHP(this.playerStats.hp, this.playerStats.maxHp);
                         this.gameScene.hud.updateXP(0, this.playerStats.xpNeeded, this.playerStats.level);
-                    } catch (e) { /* HUD might not be ready */ }
+                    } catch (e) {}
                 }
                 this.scene.stop();
             }

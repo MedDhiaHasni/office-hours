@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../main.js';
+import { soundSystem } from '../systems/SoundSystem.js';
 
 export default class MenuScene extends Phaser.Scene {
     constructor() {
@@ -9,14 +10,12 @@ export default class MenuScene extends Phaser.Scene {
     create() {
         this.cameras.main.setBackgroundColor('#2c1810');
 
-        // Unlock browser audio on first interaction
         this.input.once('pointerdown', () => {
             if (this.sound.context && this.sound.context.state === 'suspended') {
                 this.sound.context.resume();
             }
         });
 
-        // Faux wood floor streaks
         for (let i = 0; i < 40; i++) {
             this.add.rectangle(
                 Phaser.Math.Between(0, GAME_WIDTH),
@@ -27,7 +26,6 @@ export default class MenuScene extends Phaser.Scene {
             ).setAlpha(0.3);
         }
 
-        // Title
         this.add.text(GAME_WIDTH / 2, 90, 'OFFICE HOURS', {
             fontSize: '68px',
             fontFamily: 'Arial',
@@ -65,13 +63,11 @@ export default class MenuScene extends Phaser.Scene {
             fontSize: '16px', color: '#e67e22', fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Best score
         const best = localStorage.getItem('officeHoursBest') || '0:00';
         this.add.text(GAME_WIDTH / 2, 440, `Best Survival: ${best}`, {
             fontSize: '16px', color: '#f39c12'
         }).setOrigin(0.5);
 
-        // Start button
         const startBtn = this.add.text(GAME_WIDTH / 2, 510, '[ START OFFICE HOURS ]', {
             fontSize: '26px',
             fontFamily: 'Arial',
@@ -82,7 +78,10 @@ export default class MenuScene extends Phaser.Scene {
 
         startBtn.on('pointerover', () => startBtn.setColor('#ffffff'));
         startBtn.on('pointerout', () => startBtn.setColor('#2ecc71'));
-        startBtn.on('pointerdown', () => this.scene.start('GameScene'));
+        startBtn.on('pointerdown', () => {
+            soundSystem.play('uiClick');
+            this.scene.start('GameScene');
+        });
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 25,
             "💡 Tip: Keep moving. The horde does not stop.", {
