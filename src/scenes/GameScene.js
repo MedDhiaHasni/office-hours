@@ -26,6 +26,7 @@ export default class GameScene extends Phaser.Scene {
         this.kills = 0;
         this.wavesTriggered = new Set();
         this.lastFired = 0;
+        this._lastHitSound = 0; // For hit sound cooldown
 
         this.playerStats = {
             maxHp: 5,
@@ -230,7 +231,7 @@ export default class GameScene extends Phaser.Scene {
             ease: 'Back.Out'
         });
 
-        soundSystem.playLayered(['shoot', 'paperSwish']);
+        soundSystem.play('shoot'); // Just the soft shoot sound
     }
 
     enemyShoot(enemy) {
@@ -325,7 +326,12 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.cameras.main.shake(40, 0.002);
-        soundSystem.play('hit');
+
+        // NEW: Sound Cooldown (50ms) to prevent audio spam
+        if (this.time.now - this._lastHitSound > 50) {
+            soundSystem.play('hit');
+            this._lastHitSound = this.time.now;
+        }
 
         if (enemy.hp <= 0) {
             this.killEnemy(enemy);
@@ -339,8 +345,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     killEnemy(enemy) {
-        soundSystem.playLayered(['killThud', 'killPop']);
-
+        // Sound removed — visuals (hitStop, screenshake, splatters) handle the impact!
+        
         this.fx.hitStop(40);
         this.fx.deathBurst(enemy.x, enemy.y, 0xff5544, enemy.enemyConfig.isBoss ? 20 : 10);
 

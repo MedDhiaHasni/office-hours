@@ -1,40 +1,25 @@
 import { Howl } from 'howler';
 
-// Sound sources — using Google's public sound library for stability
 const SOUND_DEFS = {
+    // Volumes drastically reduced
     shoot: {
         src: ['https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg'],
-        volume: 0.15,
-        pitchVariation: 0.15
-    },
-    paperSwish: {
-        src: ['https://actions.google.com/sounds/v1/foley/paper_handling.ogg'],
-        volume: 0.08,
-        pitchVariation: 0.2
+        volume: 0.04,
+        pitchVariation: 0.1
     },
     hit: {
         src: ['https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'],
-        volume: 0.25,
-        pitchVariation: 0.25
-    },
-    killThud: {
-        src: ['https://actions.google.com/sounds/v1/cartoon/concussive_hit_guitar_boing.ogg'],
-        volume: 0.4,
-        pitchVariation: 0.1
-    },
-    killPop: {
-        src: ['https://actions.google.com/sounds/v1/cartoon/pop.ogg'],
-        volume: 0.3,
+        volume: 0.08,
         pitchVariation: 0.2
     },
     levelup: {
         src: ['https://actions.google.com/sounds/v1/alarms/beep_short.ogg'],
-        volume: 0.5,
+        volume: 0.4,
         pitchVariation: 0.05
     },
     hurt: {
         src: ['https://actions.google.com/sounds/v1/cartoon/concussive_hit_guitar_boing.ogg'],
-        volume: 0.6,
+        volume: 0.4,
         pitchVariation: 0.15
     },
     victory: {
@@ -44,7 +29,7 @@ const SOUND_DEFS = {
     },
     uiClick: {
         src: ['https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg'],
-        volume: 0.15,
+        volume: 0.1,
         pitchVariation: 0.1
     }
 };
@@ -91,10 +76,6 @@ class SoundSystem {
         if (id !== undefined) {
             howl.rate(pitch, id);
         }
-    }
-
-    playLayered(keys) {
-        keys.forEach(k => this.play(k));
     }
 
     setEnabled(v) { this.enabled = v; }
